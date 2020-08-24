@@ -69,3 +69,5 @@ To use parameters that contain paths, in order to not be interpreted as part of 
 git clone https://github.com/MaanooAk/execfs
 sudo python setup.py install
 ```
+
+Arch Linux: [AUR package](https://aur.archlinux.org/packages/execfs/).
