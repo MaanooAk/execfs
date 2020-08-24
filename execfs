@@ -16,6 +16,7 @@ import errno
 # - getattr can generate Output objects that will never be cleared
 # - check with a more cheap way if the command will run
 # - reduce the logging in the read function call
+# - revisit the file permisions
 
 UPDATE_INTERVAL_MIN = 0.5  # seconds
 UPDATE_INTERVAL_MAX = 3.5  # seconds
@@ -156,9 +157,18 @@ class Execfs(Operations):
     def readdir(self, path, fh):
         if not path[-1] == '/':
             path += '/'
-        directories = [x[x.rindex('/')+1:] for x in self.files if (x != '/' and x[:x.rindex('/')+1] == path)]
-        files = [x[x.rindex('/')+1:] for x in self.outputs if (self.outputs[x].exists() and x[:x.rindex('/')+1] == path)]
-        return ['.', '..'] + directories + files
+
+        def is_child(fullpath):
+            return fullpath[:fullpath.rindex('/')+1] == path
+
+        def filename(fullpath):
+            return fullpath[fullpath.rindex('/')+1:]
+
+        return ['.', '..'] + [
+            filename(x) for x in self.files if x != '/' and is_child(x)
+        ] + [
+            filename(x) for x in self.outputs if self.outputs[x].exists() and is_child(x)
+        ]
 
     @logit
     def unlink(self, path):
