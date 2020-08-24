@@ -65,4 +65,7 @@ To use parameters that contain paths, in order to not be interpreted as part of 
 
 ## Install
 
-TODO
+```
+git clone https://github.com/MaanooAk/execfs
+sudo python setup.py install
+```
