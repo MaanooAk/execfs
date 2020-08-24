@@ -225,11 +225,13 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('mountpoint', nargs='?', default='/tmp/execfs')
+    parser.add_argument('-b', '--background', action='store_true')
+
     parser.add_argument('-c', '--cwd', dest='cwd', default=os.path.realpath('.'))
     parser.add_argument('--home', dest='cwd', action='store_const', const=os.path.expanduser('~'))
     parser.add_argument('--cache', default='cached')
-    parser.add_argument('-l', '--logfile', default='/tmp/execfs.log')
 
+    parser.add_argument('-l', '--logfile', default='/tmp/execfs.log')
     parser.add_argument('-v', '--verbose', dest='loglevel', action='store_const', const=logging.INFO, default=logging.ERROR)
     parser.add_argument('-q', '--quiet', dest='loglevel', action='store_const', const=logging.CRITICAL+1)
     args = parser.parse_args()
@@ -252,4 +254,4 @@ if __name__ == '__main__':
     log_handler.setLevel(logging.INFO)  # always info level
     log.addHandler(log_handler)
 
-    fuse = FUSE(Execfs(args), args.mountpoint, fsname="execfs", foreground=True)
+    fuse = FUSE(Execfs(args), args.mountpoint, fsname="execfs", foreground=(not args.background))
