@@ -12,11 +12,13 @@ from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 import errno
 
 # TODOs
+# - option store the cache directory to a real directory and then reload
 # - getattr can generate Output objects that will never be cleared
 # - check with a more cheap way if the command will run
+# - reduce the logging in the read function call
 
-UPDATE_INTERVAL_MIN = 0.5 # seconds
-UPDATE_INTERVAL_MAX = 3.5 # seconds
+UPDATE_INTERVAL_MIN = 0.5  # seconds
+UPDATE_INTERVAL_MAX = 3.5  # seconds
 
 ERROR_NOSUCH = errno.ENOENT
 ERROR_NOTPERMITTED = errno.EPERM
@@ -24,6 +26,7 @@ ERROR_NODATA = errno.ENODATA
 ERROR_IO = errno.EIO
 
 log = logging.getLogger('execfs')
+
 
 def logit(target_func):
     def wrapper_func(*args, **kwargs):
@@ -68,12 +71,12 @@ class Output():
 
     def incOpens(self):
         self.opens += 1
-        
+
     def decOpens(self):
         'Returns True if this was the last open'
         self.opens -= 1
         # should never go bellow 0
-        return self.opens <= 0 
+        return self.opens <= 0
 
     @logit
     def _generate(self, command):
@@ -106,7 +109,7 @@ class Execfs(Operations):
         self.files = {}
         self.outputs = {}
         self.output_last = ('', None)
-        self.fd = 0
+        self.directory_cache = args.cache
         now = time()
         self.files['/'] = dict(
             st_mode=(stat.S_IFDIR | 0o755),
@@ -114,17 +117,18 @@ class Execfs(Operations):
             st_mtime=now,
             st_atime=now,
             st_nlink=2)
-        self.files['/cached'] = dict(
+        self.files["/{}".format(self.directory_cache)] = dict(
             st_mode=(stat.S_IFDIR | 0o755),
             st_ctime=now,
             st_mtime=now,
             st_atime=now,
             st_nlink=2)
+        self.fd = 0
 
     def create_output(self, path):
-        caching = "/cached/" in path
-        command = path[path.rindex('/')+1:] # keep only filename
-        command = command.replace('\\', '/') # decode escaped characters
+        caching = "/{}/".format(self.directory_cache) in path
+        command = path[path.rindex('/')+1:]  # keep only filename
+        command = command.replace('\\', '/')  # decode escaped characters
         output = Output(command, caching)
         return output
 
@@ -147,10 +151,6 @@ class Execfs(Operations):
     @logit
     def getattr(self, path, fh=None):
         return self.fetch_attrs(path)
-
-    @staticmethod
-    def _filename(path):
-        return path[path.rindex('/')+1:]
 
     @logit
     def readdir(self, path, fh):
@@ -177,7 +177,6 @@ class Execfs(Operations):
 
     @logit
     def read(self, path, size, offset, fh):
-        log.info(" size %d", size)
         data = self.fetch_output(path).get()
         return data[offset:offset + size]
 
@@ -186,7 +185,7 @@ class Execfs(Operations):
         data = self.fetch_output(path).get()
         data = data[:length].ljust(length, '\x00'.encode('ascii'))
         self.fetch_output(path).set(data)
-    
+
     @logit
     def write(self, path, buffer, offset, fh):
         data = self.fetch_output(path).get()
@@ -213,14 +212,16 @@ class Execfs(Operations):
 
 
 if __name__ == '__main__':
-    
+
     parser = argparse.ArgumentParser()
     parser.add_argument('mountpoint', nargs='?', default='/tmp/execfs')
     parser.add_argument('-c', '--cwd', dest='cwd', default=os.path.realpath('.'))
     parser.add_argument('--home', dest='cwd', action='store_const', const=os.path.expanduser('~'))
+    parser.add_argument('--cache', default='cached')
     parser.add_argument('-l', '--logfile', default='/tmp/execfs.log')
-    parser.add_argument('-v', '--verbose', dest='loglevel', action='store_const', const=logging.DEBUG, default=logging.INFO)
-    parser.add_argument('-q', '--quiet', dest='loglevel', action='store_const', const=logging.ERROR)
+
+    parser.add_argument('-v', '--verbose', dest='loglevel', action='store_const', const=logging.INFO, default=logging.ERROR)
+    parser.add_argument('-q', '--quiet', dest='loglevel', action='store_const', const=logging.CRITICAL+1)
     args = parser.parse_args()
 
     if not os.path.exists(args.cwd):
@@ -230,13 +231,15 @@ if __name__ == '__main__':
     if not os.path.exists(args.mountpoint):
         os.makedirs(args.mountpoint)
 
-    log.setLevel(args.loglevel)
+    log.setLevel(logging.INFO)
     log_formatter = logging.Formatter("%(asctime)s %(message)s", datefmt="%y%m%d.%H%M.%S")
     log_handler = logging.StreamHandler()
     log_handler.setFormatter(log_formatter)
+    log_handler.setLevel(args.loglevel)  # argument loglevel
     log.addHandler(log_handler)
     log_handler = logging.FileHandler(args.logfile)
     log_handler.setFormatter(log_formatter)
+    log_handler.setLevel(logging.INFO)  # always info level
     log.addHandler(log_handler)
 
     fuse = FUSE(Execfs(args), args.mountpoint, fsname="execfs", foreground=True)
