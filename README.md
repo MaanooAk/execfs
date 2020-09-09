@@ -60,8 +60,15 @@ To use parameters that contain paths, in order to not be interpreted as part of 
 
 - `mountpoit`: The first argument is the empty directory where the filesystem will be mounted, if missing the default value of `/tmp/execfs` will be used.
 - `-b`, `--background`: Start in the background.
+- `-u`, `--unsafe`: Allow possible indirect command executions (see Unsafe option).
 - `-c CWD`, `--cwd CWD`, `--home`: Set the working directory of the shell that will execute the commands.
 - `-v`, `--verbose`, `-q`, `--quiet`: Control the level of logging.
+
+#### Unsafe option
+
+Long story short, with `--unsafe`, shell tab-completion can cause some unwanted executions of commands.
+
+TODO expand
 
 ## Install
 

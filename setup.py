@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name = 'execfs',
-    version = '1.0.0',
+    version = '1.1.0',
 
     description = 'The superior FUSE filesystem for exec on file open',
     author = 'Akritas Akritidis',

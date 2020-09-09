@@ -14,7 +14,6 @@ import errno
 # TODOs
 # - option store the cache directory to a real directory and then reload
 # - getattr can generate Output objects that will never be cleared
-# - check with a more cheap way if the command will run
 # - reduce the logging in the read function call
 # - revisit the file permisions
 
@@ -115,6 +114,7 @@ class Execfs(Operations):
         self.outputs = {}
         self.output_last = ('', None)
         self.directory_cache = args.cache
+        self.unsafe = args.unsafe
         self.echo = args.echo
         now = time()
         self.files['/'] = dict(
@@ -152,12 +152,23 @@ class Execfs(Operations):
     def fetch_attrs(self, path):
         if path in self.files:
             return self.files[path]
-        # TODO ????
         return self.fetch_output(path).check().attrs
 
     @logit
     def getattr(self, path, fh=None):
-        return self.fetch_attrs(path)
+        if path in self.files or self.unsafe:
+            return self.fetch_attrs(path)
+        else:
+            now = time()
+            # Create file attrs of an executable file with a size,
+            # with a non zero file size in order to suggests programs to open file and start reading.
+            return dict(
+                st_mode=(stat.S_IFREG | 0o1777),
+                st_nlink=1,
+                st_size=4*1024*1024,
+                st_ctime=now,
+                st_mtime=now,
+                st_atime=now)
 
     @logit
     def readdir(self, path, fh):
@@ -230,13 +241,14 @@ class Execfs(Operations):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('mountpoint', nargs='?', default='/tmp/execfs')
-    parser.add_argument('-b', '--background', action='store_true')
+    parser.add_argument('mountpoint', nargs='?', default='/tmp/execfs', help='filesystem root mount point (defaults to "/tmp/execfs")')
+    parser.add_argument('-b', '--background', action='store_true', help='start on the background')
+    parser.add_argument('-u', '--unsafe', action='store_true', help='allow possible indirect command executions')
     parser.add_argument('-e', '--echo', action='store_true', help='echo commands instead of executing')
 
-    parser.add_argument('-c', '--cwd', dest='cwd', default=os.path.realpath('.'))
-    parser.add_argument('--home', dest='cwd', action='store_const', const=os.path.expanduser('~'))
-    parser.add_argument('--cache', default='cached')
+    parser.add_argument('-c', '--cwd', dest='cwd', default=os.path.realpath('.'), help='set cwd (defaults to ".")')
+    parser.add_argument('--home', dest='cwd', action='store_const', const=os.path.expanduser('~'), help='set cwd to user home')
+    parser.add_argument('--cache', default='cached', help='set the name of cache directory (defaults to "cached")')
 
     parser.add_argument('-l', '--logfile', default='/tmp/execfs.log')
     parser.add_argument('-v', '--verbose', dest='loglevel', action='store_const', const=logging.INFO, default=logging.ERROR)
