@@ -42,9 +42,10 @@ def logit(target_func):
 
 class Output():
 
-    def __init__(self, command, caching=False):
+    def __init__(self, command, caching=False, echo=False):
         self.command = command
         self.caching = caching
+        self.echo = echo
         self.data = None
         self.update = 0
         self.attrs = self._newattrs(0)
@@ -81,6 +82,9 @@ class Output():
 
     @logit
     def _generate(self, command):
+        if self.echo:
+            return self.set(command.encode('ascii') + b'\n')
+        # execute the command
         start_time = time()
         try:
             result = subprocess.run(command, check=True, capture_output=True, shell=True)
@@ -111,6 +115,7 @@ class Execfs(Operations):
         self.outputs = {}
         self.output_last = ('', None)
         self.directory_cache = args.cache
+        self.echo = args.echo
         now = time()
         self.files['/'] = dict(
             st_mode=(stat.S_IFDIR | 0o755),
@@ -130,7 +135,7 @@ class Execfs(Operations):
         caching = "/{}/".format(self.directory_cache) in path
         command = path[path.rindex('/')+1:]  # keep only filename
         command = command.replace('\\', '/')  # decode escaped characters
-        output = Output(command, caching)
+        output = Output(command, caching, self.echo)
         return output
 
     def fetch_output(self, path):
@@ -147,6 +152,7 @@ class Execfs(Operations):
     def fetch_attrs(self, path):
         if path in self.files:
             return self.files[path]
+        # TODO ????
         return self.fetch_output(path).check().attrs
 
     @logit
@@ -226,6 +232,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('mountpoint', nargs='?', default='/tmp/execfs')
     parser.add_argument('-b', '--background', action='store_true')
+    parser.add_argument('-e', '--echo', action='store_true', help='echo commands instead of executing')
 
     parser.add_argument('-c', '--cwd', dest='cwd', default=os.path.realpath('.'))
     parser.add_argument('--home', dest='cwd', action='store_const', const=os.path.expanduser('~'))
