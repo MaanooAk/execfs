@@ -15,7 +15,7 @@ libgit2-glib 0.99.0.1-2
 Here we have the `.vimrc` that is generated bash simple command, setting the colors base on the time of day, which could be wrapped into a script for better readabilty. We can achieve this using a symlink from `~/.vimrc` to `~/tmp/execfs/...`. 
 
 ```
-~$ ln -s '/tmp/execfs/[ $(date +%H) -gt 20 ] && set bg=dark || set bg=light' .vimrc
+~$ ln -s '/tmp/execfs/[ $(date +%H) -gt 20 ] && echo set bg=dark || echo set bg=light' .vimrc
 ~$ cat .vimrc
 set bg=dark
 ```
